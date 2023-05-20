@@ -1,15 +1,15 @@
-struct Cell 
+mutable struct Cell 
     value::Int
     superpositions::Array{Int}
 
     Cell() = new(0, [1,2,3,4,5,6,7,8,9])
+end
 
-    function collapse(value)
-        filter!(x->x!=value, superpositions)
-        if length(superpositions) == 1
-            value = superpositions[1]
-            pop!(superpositions)
-        end
+function collapse(cell, value)
+    filter!(x->x!=value, cell.superpositions)
+    if length(cell.superpositions) == 1
+        value = cell.superpositions[1]
+        pop!(cell.superpositions)
     end
 end
 
@@ -30,38 +30,39 @@ function get_square(grid, i, j)
 end
 
 struct Board 
-    grid::Array{Cell}(undef, 9, 9)
-    
-    Board() = new(Array{Cell}(undef, 9, 9))
+    grid
 
-    function place_on_board(value, pos)
-        row = collect(eachrow(grid))[pos.i]
-        col = collect(eachcol(grid))[pos.j]
-        sq = get_square(grid, pos.i, pos.j)
-        grid[pos.i, pos.j].collapse(value)
+    function Board()
+        ng = Array{Cell}(undef, 9, 9)
 
-        for cell in row 
-            cell.collapse(value)
+        for i in eachindex(collect(eachrow(ng)))
+            for j in eachindex(collect(eachcol(ng)))
+                ng[i, j] = Cell()
+            end
         end
-
-        for cell in col 
-            cell.collapse(value)
-        end
-
-        for cell in sq 
-            cell.collapse(value)
-        end
+        new(ng)
     end
 end
 
-#function does_collide(grid, num, i, j)
-#    square = get_square(grid, i, j)
-#
-#    rows = collect(eachrow(grid))
-#    cols = collect(eachcol(grid))
-#
-#    return (num in rows[i]) || (num in cols[j]) || (num in square)
-#end
+function place_on_board(grid, value, pos)
+    row = collect(eachrow(grid.grid))[pos.i]
+    col = collect(eachcol(grid.grid))[pos.j]
+    sq = get_square(grid.grid, pos.i, pos.j)
+    collapse(grid.grid[pos.i, pos.j], value)
+
+    for cell in row 
+        collapse(cell, value)
+    end
+
+    for cell in col 
+        collapse(cell, value)
+    end
+
+    for cell in sq 
+        collapse(cell, value)
+    end
+    grid.grid[pos.i, pos.j].value = value
+end
 
 function initialize_board()
     numbers = [
@@ -79,23 +80,68 @@ function initialize_board()
     cols = eachindex(collect(eachcol(numbers)))
     board = Board()
 
-    for i in rows
-        for j in cols 
-            #board.place_on_board(num, Position(i, j))
-            board.grid[i, j] = Cell()
-        end
-    end
-
     # the cells of the board must all  be initialized before the place_on_board() function can be called
     for i in rows 
         for j in cols 
-            board.place_on_board(numbers[i, j], Position(i, j))
+            place_on_board(board, numbers[i, j], Position(i, j))
+        end
+    end
+    return board
+end
+
+function solve_board(board)
+    rows = eachindex(collect(eachrow(board.grid)))
+    cols = eachindex(collect(eachcol(board.grid)))
+
+    # first find all solved squares
+    i = 1
+    j = 0
+    trials = 0
+    while true
+        j+=1
+        cell = board.grid[i, j]
+        if cell.value == 0
+            println(length(cell.superpositions))
+            if length(cell.superpositions) == 1
+                println("GETTING HERE")
+                place_on_board(board, cell.superpositions[1], Position(i, j))
+            end
+        end
+
+
+        if j == 9
+            i += 1
+            j = 0
+        end
+
+        if j == 9 && i == 9
+            i = 1
+            j = 0
+        end
+
+        if trials >= 150
+            break
+        else
+            trials+=1
         end
     end
 end
 
 function main()
     board = initialize_board()
+    solve_board(board)
+    #display_board(board)
+end
+
+function display_board(board)
+    numrep::Matrix{Int} = zeros(9, 9)
+    for i in eachindex(collect(eachrow(board.grid)))
+        for j in eachindex(collect(eachcol(board.grid)))
+            numrep[i, j] = board.grid[i, j].value
+        end
+    end
+
+    display(numrep)
 end
 
 main()
